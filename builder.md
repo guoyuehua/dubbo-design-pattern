@@ -19,91 +19,186 @@
 
 ##### Dubbo中的应用：
 
-| 接口      | 实现              |
-| --------- | ----------------- |
-| Directory | RegistryDirectory |
-|           | StaticDirectory   |
+| 接口            | 实现                  |
+| --------------- | --------------------- |
+| AbstractBuilder | ConfigCenterBuilder   |
+|                 | ApplicationBuilder    |
+|                 | ConsumerBuilder       |
+|                 | MetadataReportBuilder |
+|                 | MethodBuilder         |
+|                 | ModuleBuilder         |
+|                 | MonitorBuilder        |
+|                 | ProtocolBuilder       |
+|                 | ProviderBuilder       |
+|                 | ReferenceBuilder      |
+|                 | RegistryBuilder       |
+|                 | ServiceBuilder        |
 
 抽象类
 ```java
-public interface Directory<T> extends Node {
+public abstract class AbstractBuilder<T extends AbstractConfig, B extends AbstractBuilder> {
+    /**
+     * The config id
+     */
+    protected String id;
+    protected String prefix;
 
-    Class<T> getInterface();
-
-    List<Invoker<T>> list(Invocation invocation) throws RpcException;
-}
-
-public abstract class AbstractDirectory<T> implements Directory<T> {
-
-    //...
-    @Override
-    public List<Invoker<T>> list(Invocation invocation) throws RpcException {
-        if (destroyed) {
-            throw new RpcException("Directory already destroyed .url: " + getUrl());
-        }
-
-        return doList(invocation);
+    protected B id(String id) {
+        this.id = id;
+        return getThis();
     }
-    
-	protected abstract List<Invoker<T>> doList(Invocation invocation) throws RpcException;
+
+    protected B prefix(String prefix) {
+        this.prefix = prefix;
+        return getThis();
+    }
+
+    protected abstract B getThis();
+
+    protected static Map<String, String> appendParameter(Map<String, String> parameters, String key, String value) {
+        if (parameters == null) {
+            parameters = new HashMap<>();
+        }
+        parameters.put(key, value);
+        return parameters;
+    }
+
+    protected static Map<String, String> appendParameters(Map<String, String> parameters, Map<String, String> appendParameters) {
+        if (parameters == null) {
+            parameters = new HashMap<>();
+        }
+        parameters.putAll(appendParameters);
+        return parameters;
+    }
+
+    protected void build(T instance) {
+        if (!StringUtils.isEmpty(id)) {
+            instance.setId(id);
+        }
+        if (!StringUtils.isEmpty(prefix)) {
+            instance.setPrefix(prefix);
+        }
+    }
 }
 
 ```
 实现类
 
-1. RegistryDirectory
 
 ```java
-public class RegistryDirectory<T> extends AbstractDirectory<T> implements NotifyListener {
-	@Override
-    public List<Invoker<T>> doList(Invocation invocation) {
-        //...
+public class ConfigCenterBuilder extends AbstractBuilder<ConfigCenterConfig, ConfigCenterBuilder> {
 
-        if (multiGroup) {
-            return this.invokers == null ? Collections.emptyList() : this.invokers;
-        }
+    private String protocol;
+    private String address;
+    private String cluster;
+    private String namespace = "dubbo";
+    private String group = "dubbo";
+    private String username;
+    private String password;
+    private Long timeout = 3000L;
+    private Boolean highestPriority = true;
+    private Boolean check = true;
 
-        List<Invoker<T>> invokers = null;
-        try {
-            // Get invokers from cache, only runtime routers will be executed.
-            invokers = routerChain.route(getConsumerUrl(), invocation);
-        } catch (Throwable t) {
-            logger.error("Failed to execute router: " + getUrl() + ", cause: " + t.getMessage(), t);
-        }
+    private String appName;
+    private String configFile = "dubbo.properties";
+    private String appConfigFile;
 
-        return invokers == null ? Collections.emptyList() : invokers;
+    private Map<String, String> parameters;
+
+    public ConfigCenterBuilder protocol(String protocol) {
+        this.protocol = protocol;
+        return getThis();
+    }
+
+	public ConfigCenterBuilder address(String address) {
+        this.address = address;
+        return getThis();
+    }
+
+    public ConfigCenterBuilder cluster(String cluster) {
+        this.cluster = cluster;
+        return getThis();
+    }
+
+    public ConfigCenterBuilder namespace(String namespace) {
+        this.namespace = namespace;
+        return getThis();
+    }
+
+    public ConfigCenterBuilder group(String group) {
+        this.group = group;
+        return getThis();
+    }
+
+    public ConfigCenterBuilder username(String username) {
+        this.username = username;
+        return getThis();
+    }
+
+    public ConfigCenterBuilder password(String password) {
+        this.password = password;
+        return getThis();
+    }
+
+    public ConfigCenterBuilder timeout(Long timeout) {
+        this.timeout = timeout;
+        return getThis();
+    }
+
+    public ConfigCenterBuilder highestPriority(Boolean highestPriority) {
+        this.highestPriority = highestPriority;
+        return getThis();
+    }
+
+    public ConfigCenterBuilder check(Boolean check) {
+        this.check = check;
+        return getThis();
+    }
+
+    public ConfigCenterBuilder configFile(String configFile) {
+        this.configFile = configFile;
+        return getThis();
+    }
+
+    public ConfigCenterBuilder appConfigFile(String appConfigFile) {
+        this.appConfigFile = appConfigFile;
+        return getThis();
+    }
+
+    public ConfigCenterBuilder appendParameters(Map<String, String> appendParameters) {
+        this.parameters = appendParameters(this.parameters, appendParameters);
+        return getThis();
+    }
+
+    public ConfigCenterBuilder appendParameter(String key, String value) {
+        this.parameters = appendParameter(this.parameters, key, value);
+        return getThis();
+    }
+
+    public ConfigCenterConfig build() {
+        ConfigCenterConfig configCenter = new ConfigCenterConfig();
+        super.build(configCenter);
+
+        configCenter.setProtocol(protocol);
+        configCenter.setAddress(address);
+        configCenter.setCluster(cluster);
+        configCenter.setNamespace(namespace);
+        configCenter.setGroup(group);
+        configCenter.setUsername(username);
+        configCenter.setPassword(password);
+        configCenter.setTimeout(timeout);
+        configCenter.setHighestPriority(highestPriority);
+        configCenter.setCheck(check);
+        configCenter.setConfigFile(configFile);
+        configCenter.setAppConfigFile(appConfigFile);
+        configCenter.setParameters(parameters);
+
+        return configCenter;
     }
 
     @Override
-    public Class<T> getInterface() {
-        return serviceType;
+    protected ConfigCenterBuilder getThis() {
+        return this;
     }
-}
-```
-
-2. StaticDirectory
-```java
-public class StaticDirectory<T> extends AbstractDirectory<T> {
-    
-    @Override
-    public Class<T> getInterface() {
-        return invokers.get(0).getInterface();
-    }
-    
-    //...
-
-    @Override
-    protected List<Invoker<T>> doList(Invocation invocation) throws RpcException {
-        List<Invoker<T>> finalInvokers = invokers;
-        if (routerChain != null) {
-            try {
-                finalInvokers = routerChain.route(getConsumerUrl(), invocation);
-            } catch (Throwable t) {
-                logger.error("Failed to execute router: " + getUrl() + ", cause: " + t.getMessage(), t);
-            }
-        }
-        return finalInvokers == null ? Collections.emptyList() : finalInvokers;
-    }
-
 }
 ```
