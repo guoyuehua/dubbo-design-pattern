@@ -149,8 +149,6 @@ public class LoggerFactory {
 
 + 序列化
 
-
-
 抽象类
 
 ```java

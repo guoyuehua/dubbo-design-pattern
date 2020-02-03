@@ -19,6 +19,83 @@
 
 ##### Dubbo中的应用：
 
++ Code
+
+  原接口：
+
+  ```java
+  @Deprecated
+  @SPI
+  public interface Codec {
+  
+      Object NEED_MORE_INPUT = new Object();
+  
+      @Adaptive({Constants.CODEC_KEY})
+      void encode(Channel channel, OutputStream output, Object message) throws IOException;
+  
+      @Adaptive({Constants.CODEC_KEY})
+      Object decode(Channel channel, InputStream input) throws IOException;
+  
+  }
+  ```
+  新接口：
+  ```java
+  @SPI
+  public interface Codec2 {
+  
+      @Adaptive({Constants.CODEC_KEY})
+      void encode(Channel channel, ChannelBuffer buffer, Object message) throws IOException;
+  
+      @Adaptive({Constants.CODEC_KEY})
+      Object decode(Channel channel, ChannelBuffer buffer) throws IOException;
+  
+  
+      enum DecodeResult {
+          NEED_MORE_INPUT, SKIP_SOME_INPUT
+      }
+  
+  }
+  ```
+
+  适配：
+
+  ```java
+  public class CodecAdapter implements Codec2 {
+  
+      private Codec codec;
+  
+      public CodecAdapter(Codec codec) {
+          Assert.notNull(codec, "codec == null");
+          this.codec = codec;
+      }
+  
+      @Override
+      public void encode(Channel channel, ChannelBuffer buffer, Object message)
+              throws IOException {
+          UnsafeByteArrayOutputStream os = new UnsafeByteArrayOutputStream(1024);
+          codec.encode(channel, os, message);
+          buffer.writeBytes(os.toByteArray());
+      }
+  
+      @Override
+      public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
+          byte[] bytes = new byte[buffer.readableBytes()];
+          int savedReaderIndex = buffer.readerIndex();
+          buffer.readBytes(bytes);
+          UnsafeByteArrayInputStream is = new UnsafeByteArrayInputStream(bytes);
+          Object result = codec.decode(channel, is);
+          buffer.readerIndex(savedReaderIndex + is.position());
+          return result == Codec.NEED_MORE_INPUT ? DecodeResult.NEED_MORE_INPUT : result;
+      }
+  
+      public Codec getCodec() {
+          return codec;
+      }
+  }
+  ```
+
+  
+
 + 日志
 
   | 接口          | 实例类              |
@@ -288,7 +365,6 @@
           return convert(String.class, key, defaultValue);
       }
   
-  
       default Object getProperty(String key) {
           return getProperty(key, null);
       }
@@ -325,6 +401,104 @@
           return metaData.get(key);
       }
   
+  }
+  ```
+
++ AnnotationPropertyValuesAdapter
+
+  接口：
+
+  ```java
+  public interface PropertyValues {
+  
+  	/**
+  	 * Return an array of the PropertyValue objects held in this object.
+  	 */
+  	PropertyValue[] getPropertyValues();
+  
+  	/**
+  	 * Return the property value with the given name, if any.
+  	 * @param propertyName the name to search for
+  	 * @return the property value, or {@code null}
+  	 */
+  	PropertyValue getPropertyValue(String propertyName);
+  
+  	/**
+  	 * Return the changes since the previous PropertyValues.
+  	 * Subclasses should also override {@code equals}.
+  	 * @param old old property values
+  	 * @return PropertyValues updated or new properties.
+  	 * Return empty PropertyValues if there are no changes.
+  	 * @see Object#equals
+  	 */
+  	PropertyValues changesSince(PropertyValues old);
+  
+  	/**
+  	 * Is there a property value (or other processing entry) for this property?
+  	 * @param propertyName the name of the property we're interested in
+  	 * @return whether there is a property value for this property
+  	 */
+  	boolean contains(String propertyName);
+  
+  	/**
+  	 * Does this holder not contain any PropertyValue objects at all?
+  	 */
+  	boolean isEmpty();
+  
+  }
+  ```
+
+  实现类：
+
+  ```java
+  class AnnotationPropertyValuesAdapter implements PropertyValues {
+  
+      private final PropertyValues delegate;
+  
+      /**
+       * @param attributes
+       * @param propertyResolver
+       * @param ignoreAttributeNames
+       * @since 2.7.3
+       */
+      public AnnotationPropertyValuesAdapter(Map<String, Object> attributes, PropertyResolver propertyResolver,
+                                             String... ignoreAttributeNames) {
+          this.delegate = new MutablePropertyValues(resolvePlaceholders(attributes, propertyResolver, ignoreAttributeNames));
+      }
+  
+      public AnnotationPropertyValuesAdapter(Annotation annotation, PropertyResolver propertyResolver,
+                                             boolean ignoreDefaultValue, String... ignoreAttributeNames) {
+          this.delegate = new MutablePropertyValues(getAttributes(annotation, propertyResolver, ignoreDefaultValue, ignoreAttributeNames));
+      }
+  
+      public AnnotationPropertyValuesAdapter(Annotation annotation, PropertyResolver propertyResolver, String... ignoreAttributeNames) {
+          this(annotation, propertyResolver, true, ignoreAttributeNames);
+      }
+  
+      @Override
+      public PropertyValue[] getPropertyValues() {
+          return delegate.getPropertyValues();
+      }
+  
+      @Override
+      public PropertyValue getPropertyValue(String propertyName) {
+          return delegate.getPropertyValue(propertyName);
+      }
+  
+      @Override
+      public PropertyValues changesSince(PropertyValues old) {
+          return delegate.changesSince(old);
+      }
+  
+      @Override
+      public boolean contains(String propertyName) {
+          return delegate.contains(propertyName);
+      }
+  
+      @Override
+      public boolean isEmpty() {
+          return delegate.isEmpty();
+      }
   }
   ```
 
