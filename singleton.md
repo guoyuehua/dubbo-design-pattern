@@ -21,6 +21,67 @@
 
 ##### Dubbo中的应用：
 
++ Environment
+
+  ```java
+  public class Environment {
+      private static final Environment INSTANCE = new Environment();
+  
+      private Map<String, PropertiesConfiguration> propertiesConfigs = new ConcurrentHashMap<>();
+      private Map<String, SystemConfiguration> systemConfigs = new ConcurrentHashMap<>();
+      private Map<String, EnvironmentConfiguration> environmentConfigs = new ConcurrentHashMap<>();
+      private Map<String, InmemoryConfiguration> externalConfigs = new ConcurrentHashMap<>();
+      private Map<String, InmemoryConfiguration> appExternalConfigs = new ConcurrentHashMap<>();
+  
+      private Map<String, String> externalConfigurationMap = new HashMap<>();
+      private Map<String, String> appExternalConfigurationMap = new HashMap<>();
+  
+      private boolean configCenterFirst = true;
+  
+      /**
+       * FIXME, this instance will always be a type of DynamicConfiguration, ConfigCenterConfig will load the instance at startup and assign it to here.
+       */
+      private Configuration dynamicConfiguration;
+  
+      public static Environment getInstance() {
+          return INSTANCE;
+      }
+      //...
+  }
+  ```
+
+  
+
++ ConfigManager
+
+  ```java
+  public class ConfigManager {
+      private static final Logger logger = LoggerFactory.getLogger(ConfigManager.class);
+      private static final ConfigManager CONFIG_MANAGER = new ConfigManager();
+  
+      private ApplicationConfig application;
+      private MonitorConfig monitor;
+      private ModuleConfig module;
+      private ConfigCenterConfig configCenter;
+  
+      private Map<String, ProtocolConfig> protocols = new ConcurrentHashMap<>();
+      private Map<String, RegistryConfig> registries = new ConcurrentHashMap<>();
+      private Map<String, ProviderConfig> providers = new ConcurrentHashMap<>();
+      private Map<String, ConsumerConfig> consumers = new ConcurrentHashMap<>();
+  
+      public static ConfigManager getInstance() {
+          return CONFIG_MANAGER;
+      }
+  
+      private ConfigManager() {
+  
+      }
+      //...
+  }
+  ```
+
+  
+
 + ExtensionLoader
 
   ```java
